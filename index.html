@@ -51,7 +51,7 @@
   </div>
   <table><thead><tr id="headRow"></tr></thead><tbody id="bodyRows"><tr><td colspan="6" class="loading-line">Lade Daten...</td></tr></tbody></table>
   <div class="disclaimer">
-    Aggregiert aus den 59.456 im Markov-Datensatz klassifizierten Firmen (nach Börsen-Code, nicht nach Land — mehrere Länder-Börsen können unter demselben Code liegen, je nach EODHD-Konvention). "Ø Rendite" = Mittelwert der gecachten Rendite über alle Zahler dieser Börse (nicht marktkapitalisierungsgewichtet). "% Wachsend" = Anteil mit aktuellem Markov-Zustand Increase. "% Cut/Suspended" = Anteil mit Zustand Cut oder Suspended. Reine Cache-Auswertung, keine Live-Abfrage, keine Anlageberatung.
+    Renditen über 50% werden als Datenartefakt (nahe-Null-Cache-Kurs) ausgeschlossen, nicht in den Durchschnitt gerechnet. Aggregiert aus den 59.456 im Markov-Datensatz klassifizierten Firmen (nach Börsen-Code, nicht nach Land — mehrere Länder-Börsen können unter demselben Code liegen, je nach EODHD-Konvention). "Ø Rendite" = Mittelwert der gecachten Rendite über alle Zahler dieser Börse (nicht marktkapitalisierungsgewichtet). "% Wachsend" = Anteil mit aktuellem Markov-Zustand Increase. "% Cut/Suspended" = Anteil mit Zustand Cut oder Suspended. Reine Cache-Auswertung, keine Live-Abfrage, keine Anlageberatung.
   </div>
 </div>
 <script>
@@ -115,7 +115,7 @@
         if(!byExchange[ex]) byExchange[ex] = { yields:[], growing:0, risky:0, streaks:[], count:0 };
         const b = byExchange[ex];
         b.count++;
-        if(r.yieldPct) b.yields.push(r.yieldPct);
+        if(r.yieldPct && r.yieldPct <= 50) b.yields.push(r.yieldPct); // >50% is almost always a stale/near-zero cached price artifact, not a real yield
         if(r.currentState==='Increase') b.growing++;
         if(r.currentState==='Cut' || r.currentState==='Suspended') b.risky++;
         b.streaks.push(currentStreakLength(r.states));
