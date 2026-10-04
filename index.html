@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GENITUS GLOBALE DIVIDENDEN-HEATMAP</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#f4f7fb;--surface:#ffffff;--border:#d9e2ec;--accent:#0e7490;--gold:#b45309;--green:#15803d;--red:#b91c1c;--muted:#52606d;--text:#1e293b;--bright:#0f172a;--mono:'Space Mono',monospace;--sans:'Rajdhani',sans-serif;}
+    :root.dark-theme{--bg:#080c10;--surface:#0d1117;--border:#1e2d3d;--accent:#00d4ff;--gold:#f0c040;--green:#00ff88;--red:#ff3b5c;--muted:#7d92a8;--text:#c8d8e8;--bright:#ffffff;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;min-height:100vh;transition:background .25s,color .25s;}
+    header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:200;}
+    .logo{display:flex;align-items:center;gap:12px;}
+    .logo-mark{width:32px;height:32px;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;color:var(--accent);}
+    .logo-text{font-family:var(--mono);font-size:13px;letter-spacing:3px;color:var(--bright);}
+    .logo-sub{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);display:block;margin-top:1px;}
+    #themeToggleBtn{background:none;border:1px solid var(--border);color:var(--accent);width:30px;height:30px;border-radius:2px;cursor:pointer;font-size:14px;}
+    .cache-badge{font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:3px 8px;border:1px solid var(--accent);color:var(--accent);border-radius:2px;text-transform:uppercase;}
+    .main{max-width:1200px;margin:0 auto;padding:20px;}
+    .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px;}
+    select,input[type="text"]{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:8px 10px;outline:none;border-radius:2px;}
+    input[type="text"]{width:220px;}
+    .count-badge{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto;}
+    table{width:100%;border-collapse:collapse;font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+    th{font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;padding:9px 12px;text-align:right;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+    th:hover{color:var(--accent);}
+    th.sorted{color:var(--accent);}
+    th:first-child{text-align:left;}
+    td{padding:8px 12px;border-bottom:1px solid rgba(125,146,168,0.15);text-align:right;}
+    td:first-child{font-weight:700;color:var(--accent);text-align:left;font-family:var(--mono);}
+    .heatcell{text-align:center;font-family:var(--mono);font-weight:700;color:#fff;}
+    .disclaimer{font-size:10px;color:var(--muted);line-height:1.6;border-top:1px solid var(--border);padding-top:10px;margin-top:14px;}
+    .loading-line{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center;padding:50px;}
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-mark">H</div><div><span class="logo-text">GENITUS</span><span class="logo-sub">GLOBALE DIVIDENDEN-HEATMAP</span></div></div>
+  <div style="display:flex;align-items:center;gap:10px"><span class="cache-badge" id="cacheBadge">● lädt...</span><button id="themeToggleBtn" title="Toggle theme">🌙</button></div>
+</header>
+<div class="main">
+  <div class="toolbar">
+    <input type="text" id="searchInput" placeholder="Börsen-Code filtern..." oninput="renderTable()">
+    <select id="minPayersSelect" onchange="renderTable()">
+      <option value="20">Min. 20 Zahler</option>
+      <option value="50" selected>Min. 50 Zahler</option>
+      <option value="200">Min. 200 Zahler</option>
+    </select>
+    <span class="count-badge" id="countBadge"></span>
+  </div>
+  <table><thead><tr id="headRow"></tr></thead><tbody id="bodyRows"><tr><td colspan="6" class="loading-line">Lade Daten...</td></tr></tbody></table>
+  <div class="disclaimer">
+    Aggregiert aus den 59.456 im Markov-Datensatz klassifizierten Firmen (nach Börsen-Code, nicht nach Land — mehrere Länder-Börsen können unter demselben Code liegen, je nach EODHD-Konvention). "Ø Rendite" = Mittelwert der gecachten Rendite über alle Zahler dieser Börse (nicht marktkapitalisierungsgewichtet). "% Wachsend" = Anteil mit aktuellem Markov-Zustand Increase. "% Cut/Suspended" = Anteil mit Zustand Cut oder Suspended. Reine Cache-Auswertung, keine Live-Abfrage, keine Anlageberatung.
+  </div>
+</div>
+<script>
+  const DATA_URL = 'https://raw.githubusercontent.com/Babybounce500/genitus-ticker-cache/main/dividend-markov-data.json';
+  (function(){
+    const KEY='genitusTheme:heatmap';
+    function applyTheme(t){ document.documentElement.classList.toggle('dark-theme', t==='dark'); localStorage.setItem(KEY,t); const btn=document.getElementById('themeToggleBtn'); if(btn) btn.textContent = t==='dark' ? '☀' : '🌙'; }
+    let saved = localStorage.getItem(KEY) || 'light';
+    applyTheme(saved);
+    document.getElementById('themeToggleBtn').addEventListener('click', function(){ applyTheme(document.documentElement.classList.contains('dark-theme')?'light':'dark'); });
+  })();
+
+  let exchangeStats = [];
+  let sortKey='avgYield', sortDir='desc';
+  const COLUMNS = [ {key:'exchange',label:'Börse'},{key:'count',label:'Zahler'},{key:'avgYield',label:'Ø Rendite'},{key:'pctGrowing',label:'% Wachsend'},{key:'pctRisky',label:'% Cut/Suspended'},{key:'avgStreak',label:'Ø Streak (J)'} ];
+
+  function buildHead(){
+    document.getElementById('headRow').innerHTML = COLUMNS.map(c=>`<th class="${sortKey===c.key?'sorted':''}" onclick="sortBy('${c.key}')">${c.label}${sortKey===c.key?(sortDir==='asc'?' ▲':' ▼'):''}</th>`).join('');
+  }
+  window.sortBy = function(key){ if(sortKey===key) sortDir=sortDir==='asc'?'desc':'asc'; else { sortKey=key; sortDir='desc'; } buildHead(); renderTable(); };
+
+  function currentStreakLength(statesStr){
+    let n=0;
+    for(let i=statesStr.length-1;i>=0;i--){ if(statesStr[i]==='C'||statesStr[i]==='S') break; n++; }
+    return n;
+  }
+
+  function heatColor(v, max){
+    const t = Math.max(0, Math.min(1, v/max));
+    return `rgb(${Math.round(14+t*200)},${Math.round(116-t*90)},${Math.round(144-t*70)})`;
+  }
+
+  window.renderTable = function(){
+    const q = document.getElementById('searchInput').value.toLowerCase().trim();
+    const minPayers = parseInt(document.getElementById('minPayersSelect').value);
+    let rows = exchangeStats.filter(r=>r.count>=minPayers && (!q || r.exchange.toLowerCase().includes(q)));
+    rows.sort((a,b)=>{
+      const av=a[sortKey], bv=b[sortKey];
+      if(typeof av==='string') return sortDir==='asc'?av.localeCompare(bv):bv.localeCompare(av);
+      return sortDir==='asc'?av-bv:bv-av;
+    });
+    document.getElementById('countBadge').textContent = `${rows.length} Börsen`;
+    const maxYield = Math.max(...rows.map(r=>r.avgYield), 1);
+    document.getElementById('bodyRows').innerHTML = rows.map(r=>`<tr>
+      <td>${r.exchange}</td><td style="text-align:right">${r.count}</td>
+      <td class="heatcell" style="background:${heatColor(r.avgYield, maxYield)}">${r.avgYield.toFixed(2)}%</td>
+      <td class="heatcell" style="background:${heatColor(r.pctGrowing,100)}">${r.pctGrowing.toFixed(0)}%</td>
+      <td class="heatcell" style="background:${heatColor(r.pctRisky,100)}">${r.pctRisky.toFixed(0)}%</td>
+      <td style="text-align:right">${r.avgStreak.toFixed(1)}</td>
+    </tr>`).join('');
+  };
+
+  async function loadData(){
+    try{
+      const res = await fetch(DATA_URL);
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const data = await res.json();
+      const byExchange = {};
+      data.perSymbol.forEach(r=>{
+        const ex = r.exchange || 'UNKNOWN';
+        if(!byExchange[ex]) byExchange[ex] = { yields:[], growing:0, risky:0, streaks:[], count:0 };
+        const b = byExchange[ex];
+        b.count++;
+        if(r.yieldPct) b.yields.push(r.yieldPct);
+        if(r.currentState==='Increase') b.growing++;
+        if(r.currentState==='Cut' || r.currentState==='Suspended') b.risky++;
+        b.streaks.push(currentStreakLength(r.states));
+      });
+      exchangeStats = Object.entries(byExchange).map(([exchange,b])=>({
+        exchange, count:b.count,
+        avgYield: b.yields.length ? b.yields.reduce((a,c)=>a+c,0)/b.yields.length : 0,
+        pctGrowing: b.growing/b.count*100, pctRisky: b.risky/b.count*100,
+        avgStreak: b.streaks.reduce((a,c)=>a+c,0)/b.streaks.length,
+      }));
+      document.getElementById('cacheBadge').textContent = `● ${exchangeStats.length} Börsen, ${data.perSymbol.length} Firmen`;
+      buildHead();
+      renderTable();
+    }catch(e){
+      document.getElementById('cacheBadge').textContent = '● Fehler';
+      document.getElementById('bodyRows').innerHTML = `<tr><td colspan="6" class="loading-line">Fehler: ${e.message}</td></tr>`;
+    }
+  }
+  loadData();
+</script>
+</body>
+</html>
